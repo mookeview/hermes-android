@@ -3,21 +3,18 @@ import {
   ArrowUpRight,
   Brain,
   ChevronDown,
-  ChevronUp,
   EllipsisVertical,
   History as HistoryIcon,
   PanelLeft,
   PenSquare,
-  Search,
   ShieldAlert,
   ShieldCheck,
   ShieldOff,
   WifiOff,
-  X,
   type LucideIcon,
 } from '@/components/icons'
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native'
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 import ReanimatedDrawerLayout, {
   DrawerKeyboardDismissMode,
   DrawerPosition,
@@ -29,7 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Composer } from '@/components/chat/Composer'
-import { SessionChooserSheet } from '@/components/chat/SessionChooserSheet'
+import { SessionRequestsSheet } from '@/components/chat/SessionRequestsSheet'
 import { useOpenNavigationDrawer } from '@/components/MobileNavigation'
 import { ChatDrawer } from '@/components/chat/ChatDrawer'
 import { ConnectionCard } from '@/components/chat/ConnectionCard'
@@ -65,7 +62,7 @@ import {
   useChat,
 } from '@/store/chat'
 import { useConnections } from '@/store/connections'
-import { centered, font, radius, space, useTheme } from '@/theme'
+import { centered, radius, space, useTheme } from '@/theme'
 
 const LOCAL_COMMANDS: Record<string, string> = {
   new: 'new',
@@ -210,7 +207,6 @@ export default function ChatScreen() {
   const live = useChat((s) => !!(s.activeId && s.sessions[s.activeId]))
   const title = useActive((s) => s.title)
   const busy = !!useActive((s) => s.busy)
-  const hasMessages = !!useActive((s) => s.messages.length > 0)
   const blank = !!useActive((s) => s.historyLoaded && !s.messages.length && !s.loadingHistory)
   const attachments = useActive((s) => s.attachments)
   const liveModel = useActive((s) => s.info?.model)
@@ -259,19 +255,15 @@ export default function ChatScreen() {
     return creating.current
   }, [])
 
-  // In-chat search: the transcript finds the matches, the header steps through them.
-  const [searching, setSearching] = useState(false)
-  const [needle, setNeedle] = useState('')
-  const [hitIndex, setHitIndex] = useState(0)
-  const [hitCount, setHitCount] = useState(0)
-  const query = searching ? needle.trim().toLowerCase() : ''
-  useEffect(() => setHitIndex(0), [query])
-  const stepHit = (d: number) => hitCount && setHitIndex((h) => (((h + d) % hitCount) + hitCount) % hitCount)
-  const closeSearch = () => {
-    setSearching(false)
-    setNeedle('')
+  // The request sheet picks a message; the transcript scrolls to it and highlights it.
+  // `seq` bumps on every pick so tapping the same row again still re-scrolls; a stale pick from
+  // another chat is dropped during render (same pattern as editStored below).
+  const [focus, setFocus] = useState<{ id: string; seq: number } | null>(null)
+  const [focusFor, setFocusFor] = useState(activeId)
+  if (focusFor !== activeId) {
+    setFocusFor(activeId)
+    setFocus(null)
   }
-  useEffect(closeSearch, [activeId])
   // An edit draft truncated the new chat at a foreign row id after a chat switch; drop it.
   const storedId = useActive((s) => s.storedId)
   const [editStored, setEditStored] = useState(storedId)
@@ -360,57 +352,34 @@ export default function ChatScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
-      {searching ? (
-        <View style={[styles.header, { borderBottomColor: c.border }]}>
-          <IconButton icon={X} label={t('Close search')} onPress={closeSearch} />
-          <TextInput
-            value={needle}
-            onChangeText={setNeedle}
-            autoFocus
-            placeholder={t('Search this chat')}
-            placeholderTextColor={c.textFaint}
-            returnKeyType="search"
-            onSubmitEditing={() => stepHit(1)}
-            accessibilityLabel={t('Search this chat')}
-            style={[styles.searchInput, { color: c.text, fontFamily: font.regular }]}
-          />
-          <Text variant="small" tone="muted" style={{ minWidth: 40, textAlign: 'center' }} accessibilityLiveRegion="polite">
-            {needle.trim() ? (hitCount ? `${(hitIndex % hitCount) + 1}/${hitCount}` : '0') : ''}
-          </Text>
-          <IconButton icon={ChevronUp} label={t('Older match')} onPress={() => stepHit(1)} disabled={!hitCount} />
-          <IconButton icon={ChevronDown} label={t('Newer match')} onPress={() => stepHit(-1)} disabled={!hitCount} />
+      <View style={[styles.header, styles.compactHeader, { borderBottomColor: c.border }]}>
+        <IconButton icon={PanelLeft} size={18} label={t('Chats, profiles and backends')} onPress={openDrawer} style={{ marginLeft: 4 }} />
+        <View style={{ flex: 1, minHeight: 36, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('Browse requests')}
+            onPress={() => setNavigationOpen(true)}
+            style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}
+          >
+            <Text variant="title" style={{ fontSize: 15, lineHeight: 19 }} numberOfLines={1}>
+              {title || t('New chat')}
+            </Text>
+            <Text variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, lineHeight: 14 }}>
+              {[model, ctxPct != null ? t('{pct}% context', { pct: ctxPct }) : null, cwd ? String(cwd).split('/').pop() : null]
+                .filter(Boolean)
+                .join(' · ') || t('Hermes Agent')}
+            </Text>
+          </Pressable>
+          <ChevronDown size={13} color={c.textFaint} />
         </View>
-      ) : (
-        <View style={[styles.header, styles.compactHeader, { borderBottomColor: c.border }]}>
-          <IconButton icon={PanelLeft} size={18} label={t('Chats, profiles and backends')} onPress={openDrawer} style={{ marginLeft: 4 }} />
-          <View style={{ flex: 1, minHeight: 36, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('Select conversation')}
-              onPress={() => setNavigationOpen(true)}
-              style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}
-            >
-              <Text variant="title" style={{ fontSize: 15, lineHeight: 19 }} numberOfLines={1}>
-                {title || t('New chat')}
-              </Text>
-              <Text variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, lineHeight: 14 }}>
-                {[model, ctxPct != null ? t('{pct}% context', { pct: ctxPct }) : null, cwd ? String(cwd).split('/').pop() : null]
-                  .filter(Boolean)
-                  .join(' · ') || t('Hermes Agent')}
-              </Text>
-            </Pressable>
-            <ChevronDown size={13} color={c.textFaint} />
-          </View>
-          {hasMessages ? <IconButton icon={Search} size={18} label={t('Search this chat')} onPress={() => setSearching(true)} /> : null}
-          <IconButton icon={PenSquare} size={18} label={t('New chat')} onPress={() => setActive(null)} />
-          <IconButton
-            icon={EllipsisVertical}
-            size={18}
-            label={t('Chat options')}
-            onPress={() => (live ? setMenuOpen(true) : toast(t('Start a chat first.'), 'info'))}
-          />
-        </View>
-      )}
+        <IconButton icon={PenSquare} size={18} label={t('New chat')} onPress={() => setActive(null)} />
+        <IconButton
+          icon={EllipsisVertical}
+          size={18}
+          label={t('Chat options')}
+          onPress={() => (live ? setMenuOpen(true) : toast(t('Start a chat first.'), 'info'))}
+        />
+      </View>
 
       <ConnectionBanner />
 
@@ -439,7 +408,7 @@ export default function ChatScreen() {
         ) : !live || !activeId || blank ? (
           <EmptyChat onPick={(text) => handleSend(text, 'auto').catch(toastError)} />
         ) : (
-          <Transcript runtimeId={activeId} query={query} hitIndex={hitIndex} onHitCount={setHitCount} onEdit={onEdit} />
+          <Transcript runtimeId={activeId} focus={focus} onEdit={onEdit} />
         )}
 
         {myConnections.length || myRequests.length ? (
@@ -482,7 +451,11 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      <SessionChooserSheet visible={navigationOpen} onClose={() => setNavigationOpen(false)} />
+      <SessionRequestsSheet
+        visible={navigationOpen}
+        onClose={() => setNavigationOpen(false)}
+        onFocus={(id) => setFocus((f) => ({ id, seq: (f?.seq ?? 0) + 1 }))}
+      />
 
       {activeId && live ? (
         <MenuHost
@@ -693,7 +666,6 @@ const styles = StyleSheet.create({
   },
   compactHeader: { minHeight: 40, paddingVertical: 0 },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  searchInput: { flex: 1, minWidth: 0, fontSize: 16, height: 48, paddingHorizontal: space.xs },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.sm },
   empty: { flexGrow: 1, justifyContent: 'flex-end', gap: space.xl, paddingHorizontal: space.xl, paddingVertical: space.lg },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },

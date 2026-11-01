@@ -6,7 +6,6 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 import { toastError, Text } from '@/components/ui'
 import { useT } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat/types'
-import { textOf } from '@/lib/chat/types'
 import { dayLabel } from '@/lib/format'
 import { loadHistory, react, runSlash, useChat } from '@/store/chat'
 import { centered, motion, space, useTheme } from '@/theme'
@@ -17,11 +16,8 @@ const NO_MESSAGES: ChatMessage[] = []
 
 interface Props {
   runtimeId: string
-  /** Lower-cased in-chat search text; shorter than two characters means no search. */
-  query: string
-  /** Which match is current, counted from the newest. */
-  hitIndex: number
-  onHitCount: (n: number) => void
+  /** Message the request sheet picked; `seq` bumps on every pick, so re-picks re-scroll. */
+  focus: { id: string; seq: number } | null
   onEdit: (m: ChatMessage) => void
 }
 
@@ -29,7 +25,7 @@ interface Props {
  * The message list of one chat. It reads the store itself, so streamed tokens re-render this list
  * and nothing else on the chat screen.
  */
-export const Transcript = memo(function Transcript({ runtimeId, query, hitIndex, onHitCount, onEdit }: Props) {
+export const Transcript = memo(function Transcript({ runtimeId, focus, onEdit }: Props) {
   const t = useT()
   const { c } = useTheme()
   const messages = useChat((s) => s.sessions[runtimeId]?.messages ?? NO_MESSAGES)
@@ -42,23 +38,15 @@ export const Transcript = memo(function Transcript({ runtimeId, query, hitIndex,
 
   const data = useMemo(() => [...messages].reverse(), [messages])
 
-  // Hits are indexes into `data` (newest first), so stepping "older" walks down the list.
-  const hits = useMemo(() => {
-    if (query.length < 2) return NO_HITS
-    const out: number[] = []
-    data.forEach((m, i) => {
-      if (m.role !== 'system' && textOf(m).toLowerCase().includes(query)) out.push(i)
-    })
-    return out
-  }, [query, data])
-  useEffect(() => onHitCount(hits.length), [hits.length, onHitCount])
-  const hit = hits.length ? hits[hitIndex % hits.length] : -1
-  const hitId = hit >= 0 ? data[hit]?.id : undefined
+  // The request sheet picks a message; `data` is newest-first, so the index is where to land.
+  const focusId = focus?.id ?? null
   useEffect(() => {
-    if (hit >= 0) listRef.current?.scrollToIndex({ index: hit, viewPosition: 0.4, animated: true })
-    // Scroll when the match changes, not on every streamed token.
+    if (!focus) return
+    const index = data.findIndex((m) => m.id === focus.id)
+    if (index >= 0) listRef.current?.scrollToIndex({ index, viewPosition: 0.4, animated: true })
+    // Scroll when the pick changes, not on every streamed token.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hitId])
+  }, [focus?.seq])
 
   const onReact = useCallback(
     (m: ChatMessage, emoji: string) => {
@@ -90,12 +78,12 @@ export const Transcript = memo(function Transcript({ runtimeId, query, hitIndex,
             onReact={onReact}
             onEdit={onEdit}
             onRetry={index === 0 && item.role === 'assistant' && !busy ? onRetry : undefined}
-            highlighted={item.id === hitId}
+            highlighted={item.id === focusId}
           />
         </View>
       )
     },
-    [data, streamingId, busy, hitId, onReact, onEdit, onRetry],
+    [data, streamingId, busy, focusId, onReact, onEdit, onRetry],
   )
 
   return (
@@ -142,7 +130,6 @@ export const Transcript = memo(function Transcript({ runtimeId, query, hitIndex,
   )
 })
 
-const NO_HITS: number[] = []
 const keyOf = (m: ChatMessage) => m.id
 
 const styles = StyleSheet.create({

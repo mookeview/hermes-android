@@ -127,6 +127,7 @@ export const tr: Record<string, string> = {
   'Branch into a new chat': 'Yeni sohbete dallandır',
   Branched: 'Dallandırıldı',
   'Bring sessions from other agents on the backend': 'Sunucudaki diğer ajanlardan oturumları getir',
+  'Browse requests': 'İsteklere göz at',
   'Browse, preview, upload and download': 'Gözat, önizle, yükle ve indir',
   'Built-in only': 'Yalnızca yerleşik',
   'By model': 'Modele göre',
@@ -444,6 +445,7 @@ export const tr: Record<string, string> = {
   Live: 'Canlı',
   'Live chats on the backend': "Backend'deki canlı sohbetler",
   'Live subagents': 'Canlı alt ajanlar',
+  'Load earlier messages': 'Daha eski mesajları yükle',
   'Loading…': 'Yükleniyor…',
   'Local command': 'Yerel komut',
   Lock: 'Kilitle',
@@ -537,6 +539,7 @@ export const tr: Record<string, string> = {
   'No providers are set up yet. Add an API key under More → Keys.':
     'Henüz sağlayıcı kurulmadı. Diğer → Anahtarlar bölümünden bir API anahtarı ekle.',
   'No output': 'Çıktı yok',
+  'No requests yet': 'Henüz istek yok',
   'No runs yet.': 'Henüz çalıştırma yok.',
   'No scheduled jobs': 'Zamanlanmış iş yok',
   'No settings': 'Ayar yok',
