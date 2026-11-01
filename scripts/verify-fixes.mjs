@@ -1063,6 +1063,30 @@ function testWorkletSelfContained() {
   console.log(' -> PASSED: Every worklet is self-contained; no module scope is touched on the UI thread.\n')
 }
 
+// 30. 中文术语守卫：AI agent 必须译作「智能体」而非「代理」。
+//     直接读取真实词典 src/i18n/zh.ts 断言，防止后续词条重新引入误译。
+function testZhTerminologyGuard() {
+  console.log('[Test 30] Testing zh terminology (agent=智能体, not 代理)...')
+  const zh = fs.readFileSync(path.resolve('src/i18n/zh.ts'), 'utf8')
+
+  assert.ok(zh.includes("Agent: '智能体'"), "the 'Agent' entry must translate to 智能体")
+  assert.ok(zh.includes("'Hermes Agent': 'Hermes Agent'"), 'the product name Hermes Agent stays untranslated')
+  assert.ok(zh.includes("'Stop the agent': '停止智能体'"), 'agent inside sentences must read 智能体')
+  assert.ok(zh.includes("'Live subagents': '活跃子智能体'"), 'subagent must read 子智能体')
+  assert.ok(zh.includes("'Tokens in': '输入 token'"), 'token must stay lowercase in zh values')
+  assert.ok(zh.includes("'Tokens per day': '每日 token'"), 'token must stay lowercase in zh values')
+
+  // 「代理」只允许出现在真正的网络代理语境（reverse proxy / access proxy）。
+  const proxyLines = zh.split('\n').filter((l) => l.includes('代理'))
+  assert.equal(proxyLines.length, 2, `代理 may only appear for network proxies; offending lines: ${proxyLines.join(' | ')}`)
+  assert.ok(
+    proxyLines.every((l) => l.includes('反向代理') || l.includes('访问代理')),
+    'remaining 代理 usages must be the reverse-proxy / access-proxy entries',
+  )
+
+  console.log(' -> PASSED: zh dictionary keeps AI agent = 智能体; 代理 reserved for network proxies.\n')
+}
+
 function runAll() {
   console.log('=== RUNNING HERMES ANDROID VERIFICATION TEST SUITE ===\n')
   testProviderFilter()
@@ -1094,7 +1118,8 @@ function runAll() {
   testGestureRobustness()
   testVersionSourceOfTruth()
   testWorkletSelfContained()
-  console.log('=== ALL 29 SUITES PASSED (0 ERRORS) ===')
+  testZhTerminologyGuard()
+  console.log('=== ALL 30 SUITES PASSED (0 ERRORS) ===')
 }
 
 runAll()
