@@ -7,6 +7,7 @@ import { Pressable, View } from 'react-native'
 import { Badge, Button, Row, Section, Sheet, Text, toast } from '@/components/ui'
 import { t, useT } from '@/i18n'
 import { rpc, useRuntime } from '@/lib/hermes'
+import { profileLabel } from '@/lib/profiles'
 import { queryClient } from '@/lib/query'
 import { resetChat } from '@/store/chat'
 import { useConnections } from '@/store/connections'
@@ -20,6 +21,10 @@ export interface ProfileRow {
   provider?: string | null
   description?: string | null
   display_name?: string | null
+  /** Client-owned per-key metadata; `display_name` holds the nickname. */
+  ui_meta?: Record<string, unknown> | null
+  /** Per-key revision for the `ui_meta` compare-and-swap in `profiles.configure`. */
+  ui_meta_revisions?: Record<string, number>
   skill_count?: number
 }
 
@@ -63,7 +68,7 @@ export function ProfileSwitcher() {
       <Section title={t('Profile')}>
         <Row
           icon={UserCircle2}
-          title={currentRow?.display_name || currentRow?.name || current || t('default')}
+          title={profileLabel(currentRow, current || t('default'))}
           subtitle={
             [currentRow?.model, currentRow?.description].filter(Boolean).join(' · ') ||
             t('Each profile is a separate agent with its own memory, skills and config.')
@@ -93,7 +98,7 @@ export function ProfileSwitcher() {
               }}
             >
               <View style={{ flex: 1 }}>
-                <Text weight="semibold">{p.display_name || p.name}</Text>
+                <Text weight="semibold">{profileLabel(p)}</Text>
                 <Text variant="small" tone="muted" numberOfLines={2}>
                   {[p.model, p.description].filter(Boolean).join(' · ')}
                 </Text>

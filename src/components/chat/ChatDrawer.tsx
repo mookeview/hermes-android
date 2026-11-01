@@ -27,6 +27,7 @@ import { useT } from '@/i18n'
 import { previewText } from '@/lib/chat/history'
 import { relativeTime, sourceLabel } from '@/lib/format'
 import { rest, useRuntime } from '@/lib/hermes'
+import { profileLabel } from '@/lib/profiles'
 import { setActive, useChat } from '@/store/chat'
 import { useConnections } from '@/store/connections'
 import { useUpdater } from '@/services/updater'
@@ -144,7 +145,7 @@ export function ChatDrawer({ onClose }: { onClose: () => void }) {
               const on = currentProfile ? item.name === currentProfile : !!item.is_default
               return (
                 <Chip
-                  label={item.display_name || item.name}
+                  label={profileLabel(item)}
                   selected={on}
                   onPress={() => {
                     if (on) return

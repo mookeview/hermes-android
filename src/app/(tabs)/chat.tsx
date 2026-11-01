@@ -28,6 +28,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Composer } from '@/components/chat/Composer'
 import { SessionRequestsSheet } from '@/components/chat/SessionRequestsSheet'
 import { useOpenNavigationDrawer } from '@/components/MobileNavigation'
+import { useProfiles } from '@/components/ProfileSwitcher'
 import { ChatDrawer } from '@/components/chat/ChatDrawer'
 import { ConnectionCard } from '@/components/chat/ConnectionCard'
 import { ModelPicker } from '@/components/chat/ModelPicker'
@@ -40,6 +41,7 @@ import { HermesMark } from '@/components/HermesMark'
 import { Button, IconButton, Sheet, Text, toast, toastError } from '@/components/ui'
 import { haptic } from '@/lib/haptics'
 import { useT } from '@/i18n'
+import { profileLabel } from '@/lib/profiles'
 import type { ChatMessage, ChatSession, PendingAttachment } from '@/lib/chat/types'
 import { textOf } from '@/lib/chat/types'
 import { relativeTime } from '@/lib/format'
@@ -120,8 +122,12 @@ function EmptyChat({ onPick }: { onPick: (text: string) => void }) {
   const { c } = useTheme()
   const ready = useRuntime((s) => s.state === 'open')
   const profile = useProfile()
+  const profiles = useProfiles()
   const host = useConnections((s) => s.connections.find((x) => x.id === s.activeId)?.name)
   const recent = useRpc(['session.most_recent', profile], 'session.most_recent', { profile })
+  // A profile is an agent; the unset profile means the backend default one.
+  const currentProfile = profiles.data?.find((p) => (profile ? p.name === profile : p.is_default)) ?? null
+  const agentName = profileLabel(currentProfile, profile || t('default'))
   const suggestions = [
     t('What can you do?'),
     t('Summarise what we worked on yesterday'),
@@ -131,17 +137,18 @@ function EmptyChat({ onPick }: { onPick: (text: string) => void }) {
   const last = recent.data?.session_id ? recent.data : null
   return (
     <ScrollView contentContainerStyle={[styles.empty, centered]} keyboardShouldPersistTaps="handled">
-      <View style={{ gap: space.sm }}>
+      <View style={{ gap: space.sm, alignItems: 'center' }}>
         <HermesMark size={34} />
-        <Text variant="h2" style={{ marginTop: space.sm }}>
-          {t('What should Hermes work on?')}
+        <Text variant="h1" style={{ marginTop: space.sm }}>
+          {t('Hermes · {name}', { name: agentName })}
         </Text>
-        <Text tone="muted">
+        <Text tone="muted" center>
           {host
-            ? t('Runs on {host} with its own tools, memory and skills. Type / for commands, @ for files.', { host })
-            : t('Hermes runs on your machine with its tools, memory and skills. Ask anything, or type / for commands.')}
+            ? t('Runs on {host} with its own tools, memory and skills.', { host })
+            : t('Hermes runs on your machine with its tools, memory and skills.')}
         </Text>
       </View>
+      <Text variant="h2">{t('What would you like to do?')}</Text>
       {last ? (
         <Pressable
           accessibilityRole="button"
@@ -323,6 +330,10 @@ export default function ChatScreen() {
   const onSend = useCallback((text: string, mode: 'auto' | 'steer' | 'redirect') => sendRef.current(text, mode), [])
   const onPrefillConsumed = useCallback(() => setPrefill(useChat.getState().activeId ?? '', null), [])
   const onCancelEdit = useCallback(() => setEditing(null), [])
+  // Suggestion chips load into the composer instead of sending, so the prompt can be edited first.
+  const onSuggestion = useCallback((text: string) => {
+    setPrefill(useChat.getState().activeId ?? '', text)
+  }, [])
   const onStop = useCallback(() => {
     const sid = useChat.getState().activeId
     if (sid) interrupt(sid).catch(toastError)
@@ -406,7 +417,7 @@ export default function ChatScreen() {
             <ActivityIndicator color={c.accent} />
           </View>
         ) : !live || !activeId || blank ? (
-          <EmptyChat onPick={(text) => handleSend(text, 'auto').catch(toastError)} />
+          <EmptyChat onPick={onSuggestion} />
         ) : (
           <Transcript runtimeId={activeId} focus={focus} onEdit={onEdit} />
         )}

@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 
 import { ModelChooser } from '@/components/ModelChooser'
 import { ProfileAvatar } from '@/components/ProfileAvatar'
+import { useProfiles } from '@/components/ProfileSwitcher'
 import {
   Button,
   confirm,
@@ -16,6 +17,7 @@ import {
   Screen,
   Section,
   Segmented,
+  Sheet,
   Text,
   TextField,
   toast,
@@ -23,9 +25,11 @@ import {
   Toggle as UiToggle,
 } from '@/components/ui'
 import { useT } from '@/i18n'
+import { avatarPresetId, avatarPresetKey, AVATAR_PRESETS } from '@/lib/avatars'
 import type { ProfilesConfigureParams } from '@/lib/gateway/contract.generated'
 import { useRpc } from '@/lib/hooks'
 import { rest, rpc } from '@/lib/hermes'
+import { profileLabel, profileNickname } from '@/lib/profiles'
 import { queryClient } from '@/lib/query'
 import { resetChat } from '@/store/chat'
 import { useConnections } from '@/store/connections'
@@ -42,6 +46,20 @@ export default function ProfileDetail() {
   const [choosing, setChoosing] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const conn = useConnections((s) => s.connections.find((x) => x.id === s.activeId))
+  // The display name and picked avatar preset live in roster ui_meta, not in profiles.describe.
+  const roster = useProfiles()
+  const row = roster.data?.find((p) => p.name === name) ?? null
+  const storedName = profileNickname(row)
+  const [displayName, setDisplayName] = useState(storedName)
+  // A refetched roster with a changed name (saved on another device) resets the field during
+  // render (same pattern as ChatScreen's focus/editStored); equal values never clobber typing.
+  const [nameFrom, setNameFrom] = useState(storedName)
+  if (nameFrom !== storedName) {
+    setNameFrom(storedName)
+    setDisplayName(storedName)
+  }
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const pickedPreset = avatarPresetId(row?.ui_meta?.avatar)
 
   useEffect(() => {
     setSoul(q.data?.soul ?? '')
@@ -65,12 +83,53 @@ export default function ProfileDetail() {
     }
   }
 
-  const d = q.data
-  const disabledSkills = (d?.skills ?? []).filter((s) => s.enabled === false).map((s) => s.name)
-  const enabledToolsets = (d?.toolsets ?? []).filter((s) => s.enabled !== false).map((s) => s.name)
-  const enabledMcp = (d?.mcp_servers ?? []).filter((s) => s.enabled !== false).map((s) => s.name)
+  /** Per-key ui_meta compare-and-swap; false (already toasted) on conflict or error. */
+  async function writeUiMeta(key: 'display_name' | 'avatar', value: unknown): Promise<boolean> {
+    const rev = row?.ui_meta_revisions?.[key]
+    try {
+      const res = await rpc().request('profiles.configure', {
+        name,
+        ui_meta: { [key]: value },
+        ...(rev !== undefined ? { ui_meta_expected_revisions: { [key]: rev } } : {}),
+      })
+      if (res.applied.ui_meta_conflicts?.[key]) {
+        await queryClient.invalidateQueries({ queryKey: ['profiles'] })
+        toast(t('Display settings were changed on another device. Review and retry.'), 'warn')
+        return false
+      }
+      await queryClient.invalidateQueries({ queryKey: ['profiles'] })
+      return true
+    } catch (e) {
+      toastError(e)
+      return false
+    }
+  }
 
-  async function pickAvatar() {
+  const saveDisplayName = async () => {
+    setSaving('display-name')
+    try {
+      if (await writeUiMeta('display_name', displayName.trim() || null)) toast(t('Saved'), 'success')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const choosePreset = async (id: number) => {
+    setSaving('avatar')
+    try {
+      if (await writeUiMeta('avatar', avatarPresetKey(id))) {
+        // Keep storage in step with what is shown: drop any uploaded image.
+        await rpc().request('profiles.set_asset', { name, asset: 'avatar', clear: true }).catch(() => {})
+        await refreshAvatarCache()
+        setAvatarOpen(false)
+        toast(t('Saved'), 'success')
+      }
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const uploadAvatar = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       base64: true,
@@ -79,27 +138,58 @@ export default function ProfileDetail() {
       aspect: [1, 1],
     })
     if (res.canceled || !res.assets[0]?.base64) return
+    const a = res.assets[0]
+    setSaving('avatar')
     try {
-      const a = res.assets[0]
       await rpc().request('profiles.set_asset', { name, asset: 'avatar', data: `data:${a.mimeType ?? 'image/jpeg'};base64,${a.base64}` })
-      await queryClient.invalidateQueries({ queryKey: ['profile-avatar', name] })
+      // The upload replaces any picked preset.
+      await writeUiMeta('avatar', null)
+      await refreshAvatarCache()
+      setAvatarOpen(false)
       toast(t('Avatar updated'), 'success')
     } catch (e) {
       toastError(e)
+    } finally {
+      setSaving(null)
     }
   }
 
+  const resetAvatar = async () => {
+    setSaving('avatar-reset')
+    try {
+      await rpc().request('profiles.set_asset', { name, asset: 'avatar', clear: true })
+      await writeUiMeta('avatar', null)
+      await refreshAvatarCache()
+      setAvatarOpen(false)
+      toast(t('Saved'), 'success')
+    } catch (e) {
+      toastError(e)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const d = q.data
+  const disabledSkills = (d?.skills ?? []).filter((s) => s.enabled === false).map((s) => s.name)
+  const enabledToolsets = (d?.toolsets ?? []).filter((s) => s.enabled !== false).map((s) => s.name)
+  const enabledMcp = (d?.mcp_servers ?? []).filter((s) => s.enabled !== false).map((s) => s.name)
+
+  const refreshAvatarCache = () => queryClient.invalidateQueries({ queryKey: ['profile-avatar', name] })
+
   return (
     <Screen refreshing={q.isRefetching} onRefresh={() => q.refetch()}>
-      <Stack.Screen options={{ title: name }} />
+      <Stack.Screen options={{ title: profileLabel(row, name) }} />
       {q.isLoading ? <Loading /> : null}
       {q.error ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('Change avatar')} onPress={pickAvatar}>
-          <ProfileAvatar name={name} size={72} />
-        </Pressable>
+        <ProfileAvatar name={name} size={72} meta={row?.ui_meta} />
         <View style={{ flex: 1, gap: space.xs }}>
-          <Text variant="h2">{name}</Text>
+          <Text variant="h2">{profileLabel(row, name)}</Text>
+          {row && profileLabel(row) !== row.name ? (
+            <Text variant="caption" tone="faint">
+              {name}
+            </Text>
+          ) : null}
           <Text variant="small" tone="muted">
             {d?.model?.default ? `${d.model.default} · ${d.model.provider}` : t('Uses the global model')}
           </Text>
@@ -147,6 +237,42 @@ export default function ProfileDetail() {
           }}
           last
         />
+      </Section>
+
+      <Section title={t('Display')}>
+        <View style={[styles.displayRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+          <Text variant="small" weight="medium" tone="muted" style={styles.displayLabel}>
+            {t('Display name')}
+          </Text>
+          {/* The wrapper carries the flex: TextField's own style lands on the inner TextInput. */}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <TextField
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder={t('A human-friendly name for this agent')}
+            />
+          </View>
+          <Button
+            size="sm"
+            label={t('Save')}
+            loading={saving === 'display-name'}
+            disabled={displayName.trim() === storedName.trim()}
+            onPress={saveDisplayName}
+          />
+        </View>
+        <View style={styles.displayRow}>
+          <Text variant="small" weight="medium" tone="muted" style={styles.displayLabel}>
+            {t('Avatar')}
+          </Text>
+          <ProfileAvatar name={name} size={36} meta={row?.ui_meta} />
+          <Button
+            size="sm"
+            variant="secondary"
+            label={t('Change avatar')}
+            onPress={() => setAvatarOpen(true)}
+            style={{ marginLeft: 'auto' }}
+          />
+        </View>
       </Section>
 
       <Section title={t('Description')}>
@@ -317,6 +443,38 @@ export default function ProfileDetail() {
           }}
         />
       </Section>
+      <Sheet visible={avatarOpen} onClose={() => setAvatarOpen(false)} title={t('Change avatar')}>
+        <Text variant="caption" tone="faint">
+          {t('Built-in avatars')}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+          {AVATAR_PRESETS.map((p, i) => (
+            <Pressable
+              key={p.emoji}
+              accessibilityRole="button"
+              accessibilityState={{ selected: pickedPreset === i }}
+              disabled={saving === 'avatar'}
+              onPress={() => choosePreset(i)}
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: p.bg,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: pickedPreset === i ? 2 : StyleSheet.hairlineWidth,
+                borderColor: pickedPreset === i ? c.accent : c.border,
+              }}
+            >
+              <Text style={{ fontSize: 26, lineHeight: 32 }}>{p.emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Button variant="secondary" label={t('Upload from device')} loading={saving === 'avatar'} onPress={uploadAvatar} />
+          <Button variant="secondary" label={t('Reset to default')} loading={saving === 'avatar-reset'} onPress={resetAvatar} />
+        </View>
+      </Sheet>
       <ModelChooser
         visible={choosing}
         title={t('Model for {name}', { name })}
@@ -362,6 +520,15 @@ function ItemToggle({
 }
 
 const styles = StyleSheet.create({
+  displayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    minHeight: 56,
+  },
+  displayLabel: { width: 80 },
   toggle: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui'
 import { useT } from '@/i18n'
 import { relativeTime } from '@/lib/format'
+import { profileLabel } from '@/lib/profiles'
 import { rpc } from '@/lib/hermes'
 import { queryClient } from '@/lib/query'
 import { useConnections } from '@/store/connections'
@@ -56,10 +57,10 @@ export default function ProfilesScreen() {
             onPress={() => router.push({ pathname: '/profiles/[name]', params: { name: p.name } })}
             style={({ pressed }) => [styles.card, { backgroundColor: pressed ? c.surfaceAlt : c.surface, borderColor: c.border }]}
           >
-            <ProfileAvatar name={p.name} size={40} />
+            <ProfileAvatar name={p.name} size={40} meta={p.ui_meta} />
             <View style={{ flex: 1, gap: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' }}>
-                <Text weight="semibold">{p.display_name || p.name}</Text>
+                <Text weight="semibold">{profileLabel(p)}</Text>
                 {onPhone ? <Check size={16} color={c.accentText} strokeWidth={2} accessibilityLabel={t('on this phone')} /> : null}
               </View>
               <Text variant="small" tone="muted" numberOfLines={2}>

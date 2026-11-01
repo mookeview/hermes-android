@@ -9,6 +9,7 @@ import { useT } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat/types'
 import { chatOutline, type OutlineRow } from '@/lib/chat/outline'
 import { hhmm } from '@/lib/format'
+import { profileLabel } from '@/lib/profiles'
 import { loadHistory, useChat } from '@/store/chat'
 import { font, radius, space, useTheme } from '@/theme'
 
@@ -48,7 +49,7 @@ export function SessionRequestsSheet({
   const profileRow = profileName
     ? profiles.data?.find((p) => p.name === profileName)
     : profiles.data?.find((p) => p.is_default)
-  const agentName = profileRow?.display_name || profileRow?.name || profileName || t('Hermes Agent')
+  const agentName = profileLabel(profileRow, profileName || t('Hermes Agent'))
 
   const rows = useMemo(() => chatOutline(messages, query), [messages, query])
 

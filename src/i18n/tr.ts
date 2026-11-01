@@ -108,7 +108,9 @@ export const tr: Record<string, string> = {
   Automate: 'Otomasyon',
   'Automation created': 'Otomasyon oluşturuldu',
   'Auxiliary models': 'Yardımcı modeller',
+  Avatar: 'Avatar',
   'Avatar updated': 'Avatar güncellendi',
+  'Built-in avatars': 'Yerleşik avatarlar',
   'Average latency': 'Ortalama gecikme',
   Backend: 'Sunucu',
   'Backend address': 'Sunucu adresi',
@@ -247,6 +249,10 @@ export const tr: Record<string, string> = {
   'Delivery failed: {e}': 'İletim başarısız: {e}',
   Deny: 'Reddet',
   Description: 'Açıklama',
+  Display: 'Görünüm',
+  'Display name': 'Görünen ad',
+  'Display settings were changed on another device. Review and retry.':
+    'Görünüm ayarları başka bir cihazda değiştirildi. Kontrol edip yeniden dene.',
   Desktop: 'Masaüstü',
   Details: 'Ayrıntılar',
   'Detect token': "Token'ı algıla",
@@ -360,6 +366,7 @@ export const tr: Record<string, string> = {
   Heartbeat: 'Heartbeat',
   'Hello! This is how Hermes sounds.': 'Merhaba! Hermes böyle konuşuyor.',
   'Hermes (backend TTS)': 'Hermes (backend TTS)',
+  'Hermes · {name}': 'Hermes · {name}',
   'Hermes Agent': 'Hermes Ajanı',
   'Hermes backend': 'Hermes sunucusu',
   'Hermes did not answer.': 'Hermes yanıt vermedi.',
@@ -370,8 +377,8 @@ export const tr: Record<string, string> = {
     'Hermes iki defter tutar: USER.md (sen kimsin) ve MEMORY.md (çalışırken öğrendikleri). Ayrıca geçmiş oturumlarda arama yapar.',
   'Hermes needs the camera to read the QR code.': "Hermes'in QR kodunu okumak için kameraya ihtiyacı var.",
   'Hermes needs your input': "Hermes'in girdine ihtiyacı var",
-  'Hermes runs on your machine with its tools, memory and skills. Ask anything, or type / for commands.':
-    'Hermes araçları, belleği ve yetenekleriyle makinende çalışır. İstediğini sor ya da komutlar için / yaz.',
+  'Hermes runs on your machine with its tools, memory and skills.':
+    'Hermes araçları, belleği ve yetenekleriyle makinende çalışır.',
   'Hermes saves facts as you work together. Tell it "remember that…" in a chat.':
     'Hermes birlikte çalışırken bilgileri kaydeder. Sohbette ona "şunu hatırla…" de.',
   'Hermes will no longer remember this.': 'Hermes bunu artık hatırlamayacak.',
@@ -681,6 +688,7 @@ export const tr: Record<string, string> = {
   'Rescan plugins': 'Eklentileri yeniden tara',
   'Rescan skill folders': 'Yetenek klasörlerini yeniden tara',
   Reset: 'Sıfırla',
+  'Reset to default': 'Varsayılana dön',
   'Reset all': 'Tümünü sıfırla',
   'Reset all memory': 'Tüm belleği sıfırla',
   'Reset every auxiliary task to the main model?': 'Tüm yardımcı görevler ana modele sıfırlansın mı?',
@@ -966,6 +974,7 @@ export const tr: Record<string, string> = {
   'Updating Hermes': 'Hermes güncelleniyor',
   'Upgrade config.yaml to the latest version': 'config.yaml dosyasını en son sürüme yükselt',
   'Upload a debug report?': 'Hata ayıklama raporu yüklensin mi?',
+  'Upload from device': 'Cihazdan yükle',
   'Upload files here': 'Dosyaları buraya yükle',
   'Uploaded to the session workspace as an @file reference': 'Oturum çalışma alanına @file referansı olarak yüklendi',
   'Uploaded {n} files': '{n} dosya yüklendi',
@@ -1122,6 +1131,7 @@ export const tr: Record<string, string> = {
   '{s} sessions · {c} calls': '{s} oturum · {c} çağrı',
   '{task} → {model}': '{task} → {model}',
   '{total} skills · {added} added · {removed} removed': 'Toplam {total} yetenek · {added} eklendi · {removed} kaldırıldı',
+  'A human-friendly name for this agent': 'Bu ajan için insan dostu bir ad',
   'A lighthouse at dusk, watercolor': 'Alacakaranlıkta bir deniz feneri, suluboya',
   'A room puts several of your agent profiles in one conversation. They reply in turn and can work on tasks together.':
     'Oda, birkaç ajan profilini tek bir sohbette buluşturur. Sırayla yanıt verirler ve görevler üzerinde birlikte çalışabilirler.',
@@ -1247,9 +1257,9 @@ export const tr: Record<string, string> = {
   'Search {n} pets': '{n} evcil hayvanda ara',
   'This model is expensive. Switch anyway?': 'Bu model pahalı. Yine de geçilsin mi?',
   'Pick up where you left off': 'Kaldığın yerden devam et',
-  'Runs on {host} with its own tools, memory and skills. Type / for commands, @ for files.':
-    '{host} üzerinde kendi araçları, belleği ve yetenekleriyle çalışır. Komutlar için /, dosyalar için @ yaz.',
-  'What should Hermes work on?': 'Hermes ne üzerinde çalışsın?',
+  'Runs on {host} with its own tools, memory and skills.':
+    '{host} üzerinde kendi araçları, belleği ve yetenekleriyle çalışır.',
+  'What would you like to do?': 'Ne yapmak istersiniz?',
   'due now': 'şimdi çalışacak',
   'in {n}d': '{n} gün sonra',
   'in {n}h': '{n} sa sonra',
