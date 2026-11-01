@@ -1,38 +1,33 @@
-import Constants from 'expo-constants'
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { memo, useMemo, useState } from 'react'
-import { FlatList, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { SessionRow } from '@/app/(tabs)/sessions'
 import { HermesMark } from '@/components/HermesMark'
 import {
-  ArrowUpCircle,
   Bot,
   CalendarClock,
   Check,
   ChevronDown,
   ChevronUp,
   History as HistoryIcon,
-  Info,
   LayoutGrid,
   PenSquare,
   Pin,
-  RefreshCw,
   Search,
   Server,
   Settings2,
 } from '@/components/icons'
 import type { LucideIcon } from '@/components/icons'
 import { switchProfile, useProfiles } from '@/components/ProfileSwitcher'
-import { Chip, Text, VersionModal, toast, toastError } from '@/components/ui'
+import { Chip, Text } from '@/components/ui'
 import { useT } from '@/i18n'
 import { previewText } from '@/lib/chat/history'
 import { relativeTime, sourceLabel } from '@/lib/format'
 import { rest, useRuntime } from '@/lib/hermes'
-import { useRest } from '@/lib/hooks'
-import { openStored, setActive, useChat } from '@/store/chat'
+import { setActive, useChat } from '@/store/chat'
 import { useConnections } from '@/store/connections'
 import { useUpdater } from '@/services/updater'
 import { font, radius, space, useTheme } from '@/theme'
@@ -48,14 +43,10 @@ export function ChatDrawer({ onClose }: { onClose: () => void }) {
   const connected = useRuntime((s) => s.state === 'open')
   const connections = useConnections((s) => s.connections)
   const activeConn = useConnections((s) => s.connections.find((x) => x.id === s.activeId))
-  const health = useRest<{ version?: string; displayVersion?: string }>(['health'], '/api/health')
   const updateInfo = useUpdater((s) => s.info)
-  const checkingUpdate = useUpdater((s) => s.checking)
-  const checkUpdate = useUpdater((s) => s.check)
   const profiles = useProfiles()
   const currentProfile = activeConn?.profile ?? null
   const [backendsOpen, setBackendsOpen] = useState(false)
-  const [versionModalOpen, setVersionModalOpen] = useState(false)
   const [q, setQ] = useState('')
   const activeStored = useChat((s) => (s.activeId ? s.sessions[s.activeId]?.storedId : null))
 
@@ -77,7 +68,7 @@ export function ChatDrawer({ onClose }: { onClose: () => void }) {
 
   const open = (row: SessionRow) => {
     onClose()
-    openStored(row.id).catch(toastError)
+    router.navigate({ pathname: '/chat', params: { stored: row.id } })
   }
 
   return (
@@ -181,6 +172,7 @@ export function ChatDrawer({ onClose }: { onClose: () => void }) {
         onPress={() => {
           onClose()
           setActive(null)
+          router.navigate('/chat')
         }}
         style={({ pressed }) => [styles.newChat, { borderColor: c.border, backgroundColor: pressed ? c.surfaceAlt : c.elevated }]}
       >
@@ -246,25 +238,21 @@ export function ChatDrawer({ onClose }: { onClose: () => void }) {
             label={t('Settings')}
             onPress={() => {
               onClose()
-              router.navigate('/more')
+              router.navigate('/settings')
             }}
           />
           <DrawerNavItem
-            icon={updateInfo?.hasUpdate ? ArrowUpCircle : Info}
-            label={updateInfo?.hasUpdate ? t('Update') : t('Info')}
+            icon={LayoutGrid}
+            label={t('More')}
             hasBadge={updateInfo?.hasUpdate}
             badgeColor={c.accent}
-            iconColor={updateInfo?.hasUpdate ? c.accent : undefined}
-            onPress={() => setVersionModalOpen(true)}
+            onPress={() => {
+              onClose()
+              router.navigate('/more')
+            }}
           />
         </View>
       </View>
-
-      <VersionModal
-        visible={versionModalOpen}
-        onClose={() => setVersionModalOpen(false)}
-        gatewayVersion={health.data?.displayVersion || health.data?.version}
-      />
     </View>
   )
 }

@@ -1002,8 +1002,9 @@ function testVersionSourceOfTruth() {
   assert.ok(code >= 39, `versionCode must keep climbing past the stuck-at-13 era (got ${code})`)
 
   // CHANGELOG 最新条目必须与 app.json 的版本一致，防止"改了版本忘了写日志"
+  // 标题规范是 `## [版本号]`（docs/changelog-guidelines.md）；旧条目带 v 前缀，两者都要认。
   const changelog = fs.readFileSync(path.resolve('CHANGELOG.md'), 'utf-8')
-  const firstEntry = changelog.match(/## \[v([^\]]+)\]/)?.[1]
+  const firstEntry = changelog.match(/## \[v?([^\]]+)\]/)?.[1]
   assert.equal(
     firstEntry,
     version,
@@ -1087,6 +1088,68 @@ function testZhTerminologyGuard() {
   console.log(' -> PASSED: zh dictionary keeps AI agent = 智能体; 代理 reserved for network proxies.\n')
 }
 
+// 31. 抽屉导航契约：读取真实组件 ChatDrawer 源码断言。
+//     症状 -> 根因 -> 修复：
+//     a) 底部「设置」按钮标题是 Settings 却 navigate('/more')，落地页标题显示「更多」——目标必须是 /settings。
+//     b) 历史会话行只调 openStored()（仅改 store 不导航），从非 chat 标签页打开抽屉点击后停留在原页面
+//        ——必须走全应用统一的 router.navigate({ pathname: '/chat', params: { stored } }) 管线。
+//     c) 「新聊天」按钮同样只 setActive(null) 不导航，属于同根缺陷。
+function testDrawerNavigationContracts() {
+  console.log('[Test 31] Testing ChatDrawer navigation contracts (reads ChatDrawer source)...')
+  const src = fs.readFileSync(path.resolve('src/components/chat/ChatDrawer.tsx'), 'utf8')
+
+  // a) 底部导航项的标签与导航目标必须配对正确：Settings -> /settings，More -> /more。
+  //    （历史 bug：Settings 项误导航到 /more，落地页标题显示「更多」。）
+  const navTargetOf = (label) => {
+    const at = src.indexOf(`label={t('${label}')}`)
+    assert.ok(at >= 0, `drawer must keep a '${label}' nav item`)
+    const m = src.slice(at, at + 200).match(/router\.navigate\('([^']+)'\)/)
+    assert.ok(m, `drawer '${label}' nav item must call router.navigate`)
+    return m[1]
+  }
+  assert.equal(navTargetOf('Settings'), '/settings', "drawer 'Settings' item must navigate to /settings, not the More hub")
+  assert.equal(navTargetOf('More'), '/more', "drawer 'More' item must navigate to /more")
+
+  // b) 历史会话行：必须经由 chat 屏的 stored 参数 effect 打开（含连接门控与错误 toast），
+  //    保证从任何标签页（如设置页）点击都真正落到会话页。
+  assert.ok(
+    src.includes("pathname: '/chat', params: { stored: row.id }"),
+    'drawer session rows must navigate to /chat with the stored param',
+  )
+  assert.ok(
+    !src.includes('openStored('),
+    'drawer must not call openStored() directly — the chat screen owns session opening via its params.stored effect',
+  )
+
+  // c) 新聊天：清空 activeId 后必须导航回 chat 页。
+  assert.ok(
+    /setActive\(null\)\s*\r?\n\s*router\.navigate\('\/chat'\)/.test(src),
+    "drawer 'New chat' must navigate to /chat after clearing the active session",
+  )
+
+  console.log(' -> PASSED: drawer Settings -> /settings; session rows and New chat land on /chat.\n')
+}
+
+// 32. Sheet 打开置顶：读取真实组件 src/components/ui/Sheet.tsx 断言。
+//     症状 -> 根因 -> 修复：会话设置等底部弹层重新打开时停留在上次滚动位置。
+//     Sheet 为退出动画保持挂载，内部 ScrollView 偏移跨开关存活——打开时必须 scrollTo 回顶。
+function testSheetScrollResetOnOpen() {
+  console.log('[Test 32] Testing Sheet scroll-to-top on open (reads Sheet source)...')
+  const src = fs.readFileSync(path.resolve('src/components/ui/Sheet.tsx'), 'utf8')
+
+  assert.ok(src.includes('useRef<ScrollView>'), 'Sheet must hold a ref to its ScrollView')
+  assert.ok(src.includes("scrollTo({ y: 0, animated: false })"), 'Sheet must reset scroll offset to top on open')
+  // 重置必须发生在 visible 变为 true 的分支里，而不是只挂了个未接线的 ref。
+  const openBranch = src.slice(src.indexOf('if (visible)'), src.indexOf('} else {'))
+  assert.ok(
+    openBranch.includes('scrollTo({ y: 0, animated: false })'),
+    'the scrollTo reset must run inside the visible=true branch of the open/close effect',
+  )
+  assert.ok(src.includes('<ScrollView') && src.includes('ref={scrollRef}'), 'the ScrollView must be wired to scrollRef')
+
+  console.log(' -> PASSED: every Sheet open starts scrolled to the top.\n')
+}
+
 function runAll() {
   console.log('=== RUNNING HERMES ANDROID VERIFICATION TEST SUITE ===\n')
   testProviderFilter()
@@ -1119,7 +1182,9 @@ function runAll() {
   testVersionSourceOfTruth()
   testWorkletSelfContained()
   testZhTerminologyGuard()
-  console.log('=== ALL 30 SUITES PASSED (0 ERRORS) ===')
+  testDrawerNavigationContracts()
+  testSheetScrollResetOnOpen()
+  console.log('=== ALL 32 SUITES PASSED (0 ERRORS) ===')
 }
 
 runAll()

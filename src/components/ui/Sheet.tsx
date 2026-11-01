@@ -1,5 +1,5 @@
 import { X } from '@/components/icons'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
@@ -47,10 +47,14 @@ export function Sheet({ visible, onClose, title, children, noScroll, footer, hei
   const progress = useSharedValue(0)
   const drag = useSharedValue(0)
   const sheetHeight = useSharedValue(height)
+  const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
     if (visible) {
       drag.set(0)
+      // The ScrollView stays mounted through the exit animation, so its offset survives a close;
+      // every open must start fresh at the top.
+      scrollRef.current?.scrollTo({ y: 0, animated: false })
       progress.set(withSpring(1, SPRING))
     } else {
       progress.set(
@@ -122,6 +126,7 @@ export function Sheet({ visible, onClose, title, children, noScroll, footer, hei
               <View style={{ flexShrink: 1, paddingHorizontal: space.lg }}>{shown.children}</View>
             ) : (
               <ScrollView
+                ref={scrollRef}
                 style={{ flexShrink: 1 }}
                 contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.md, gap: space.md }}
                 keyboardShouldPersistTaps="handled"
